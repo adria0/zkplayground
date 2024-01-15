@@ -16,11 +16,10 @@ https://semiotic.ai/articles/sumcheck-tutorial/
 mod test {
     type F = ark_bn254::fr::Fr;
     type P = SparsePolynomial<ark_bn254::fr::Fr, SparseTerm>;
-    use crate::util::partial_poly_eval;
     use ark_ff::{Field, Zero};
     use ark_poly::multivariate::{SparsePolynomial, SparseTerm};
     use ark_poly::{DenseMVPolynomial, Polynomial};
-    use crate::util::mpoly;
+    use crate::util::{mpoly, MultiPolyUtils};
 
     fn gen_hypercube_domain(pow: usize) -> Vec<Vec<F>> {
         let mut domain = vec![vec![F::ZERO], vec![F::ONE]];
@@ -71,13 +70,13 @@ mod test {
                 .enumerate()
                 .map(|(var, value)| (var + 1, value))
                 .collect();
-            s0 = s0 + partial_poly_eval(&g, &evals)
+            s0 = s0 + g.partial_eval(&evals)
         }
 
         // Verifier: recieves s0 and checks that s0(0) + s0(1) == H
 
         assert_eq!(
-            partial_poly_eval(&s0, &[(X, F::ZERO)]) + partial_poly_eval(&s0, &[(X, F::ONE)]),
+            s0.partial_eval(&[(X, F::ZERO)]) + s0.partial_eval(&[(X, F::ONE)]),
             P::from_coefficients_vec(0, vec![(H, SparseTerm::default())])
         );
 
@@ -99,14 +98,14 @@ mod test {
                 .map(|(var, value)| (var + 2, value))
                 .collect();
             evals.push((X, r0));
-            s1 = s1 + partial_poly_eval(&g, &evals)
+            s1 = s1 + g.partial_eval(&evals)
         }
 
         // Verifier: checks that s1(0) + s1(1) == s0(r0)
 
         assert_eq!(
-            partial_poly_eval(&s1, &[(Y, F::ZERO)]) + partial_poly_eval(&s1, &[(Y, F::ONE)]),
-            partial_poly_eval(&s0, &[(X, r0)])
+            s1.partial_eval(&[(Y, F::ZERO)]) + s1.partial_eval(&[(Y, F::ONE)]),
+            s0.partial_eval(&[(X, r0)])
         );
 
         // Verifier: now samples (random or fiat-shamir) an r1 ( = 7) and sends it to the prover
@@ -117,13 +116,13 @@ mod test {
         // s2 = g(r0,r1,z) = 9z+16
         // sends s2 to verifier
 
-        let s2 = partial_poly_eval(&g, &[(X, r0), (Y, r1)]);
+        let s2 = g.partial_eval(&[(X, r0), (Y, r1)]);
 
         // Verifier: checks that s2(0) + s2(1) == s1(r1), that is the final check
 
         assert_eq!(
-            partial_poly_eval(&s2, &[(Z, F::ZERO)]) + partial_poly_eval(&s2, &[(Z, F::ONE)]),
-            partial_poly_eval(&s1, &[(Y, r1)])
+            s2.partial_eval(&[(Z, F::ZERO)]) + s2.partial_eval(&[(Z, F::ONE)]),
+            s1.partial_eval(&[(Y, r1)])
         );
 
         // so the verifier only has to do log(n) checks to verify if the sum of all the images of g is ok

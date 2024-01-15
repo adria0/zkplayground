@@ -20,6 +20,10 @@ pub trait PolyToString {
     fn to_string(&self) -> String;
 }
 
+pub trait MultiPolyUtils<F> {
+    fn partial_eval(&self, evals: &[(usize, F)]) -> Self;
+}
+
 impl<F: Field + Display> PolyToString for DensePolynomial<F> {
     fn to_string(&self) -> String {
         unipoly_to_str(self)
@@ -258,13 +262,13 @@ fn multipoly_to_str<F: Field + Display>(p: &SparsePolynomial<F, SparseTerm>) -> 
     }
 }
 
-// this function partially evaluates a polinomial
-pub fn partial_poly_eval<F: Field>(mpoly: &SparsePolynomial<F, SparseTerm>, evals: &[(usize, F)]) -> SparsePolynomial<F, SparseTerm> {
+impl<F:Field> MultiPolyUtils<F> for SparsePolynomial<F, SparseTerm> {
+fn partial_eval(&self, evals: &[(usize, F)]) -> Self {
 
     let evals : HashMap<usize,F> = evals.iter().cloned().collect();
 
     // substitute
-    let terms: Vec<(F, Vec<(usize, usize)>)> = mpoly
+    let terms: Vec<(F, Vec<(usize, usize)>)> = self
         .terms
         .iter()
         .map(|(factor, vars)| {
@@ -290,7 +294,8 @@ pub fn partial_poly_eval<F: Field>(mpoly: &SparsePolynomial<F, SparseTerm>, eval
         entry.0 += f;
     }
 
-    SparsePolynomial::from_coefficients_vec(mpoly.num_vars, compact.into_values().collect())
+    SparsePolynomial::from_coefficients_vec(self.num_vars, compact.into_values().collect())
+}
 }
 
 #[cfg(test)]
@@ -375,13 +380,13 @@ mod tests {
     fn test_partial_eval() {
         let g: SparsePolynomial<Fr, SparseTerm> = mpoly!("8x^3+xz+yz");
 
-        let s0 = partial_poly_eval(&g, &[(0, Fr::from(2))]);
+        let s0 = g.partial_eval(&[(0, Fr::from(2))]);
         assert_eq!(s0.to_string(), "yz+2z+64");
 
-        let s1 = partial_poly_eval(&s0, &[(2, Fr::from(100))]);
+        let s1 = s0.partial_eval(&[(2, Fr::from(100))]);
         assert_eq!(s1.to_string(), "100y+264");
 
-        let s2 = partial_poly_eval(&s1, &[(1, Fr::from(8))]);
+        let s2 = s1.partial_eval(&[(1, Fr::from(8))]);
         assert_eq!(s2.to_string(), "1064");
     }
 

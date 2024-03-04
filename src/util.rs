@@ -1,16 +1,17 @@
 #![allow(unused)]
 
-use ark_ff::Field;
+use ark_ff::{Field, Zero};
 use ark_poly::multivariate::Term;
 use ark_poly::DenseMVPolynomial;
 use ark_poly::{
     multivariate::{SparsePolynomial, SparseTerm},
     univariate::DensePolynomial,
-    DenseUVPolynomial,
+    DenseUVPolynomial, Polynomial,
 };
 use ark_std::One;
-use std::collections::{HashSet, HashMap, BTreeMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Display;
+use std::ops::Mul;
 use std::str::Chars;
 
 const MPOLY_VARS: &str = "xyzwutsrqabcdefg";
@@ -22,6 +23,13 @@ pub trait PolyToString {
 
 pub trait MultiPolyUtils<F> {
     fn partial_eval(&self, evals: &[(usize, F)]) -> Self;
+}
+
+pub trait UniPolyUtils<F: Field> {
+    /// Composes x with p(x): self(x) ∘ p(x)
+    fn compose(&self, p: &DensePolynomial<F>) -> DensePolynomial<F>;
+    fn lagrange(points: &[(F, F)]) -> DensePolynomial<F>;
+    fn vanishing<I: IntoIterator<Item=F>>(zeros: I) -> DensePolynomial<F>;
 }
 
 impl<F: Field + Display> PolyToString for DensePolynomial<F> {
@@ -262,40 +270,88 @@ fn multipoly_to_str<F: Field + Display>(p: &SparsePolynomial<F, SparseTerm>) -> 
     }
 }
 
-impl<F:Field> MultiPolyUtils<F> for SparsePolynomial<F, SparseTerm> {
-fn partial_eval(&self, evals: &[(usize, F)]) -> Self {
+pub fn poly_i32<const N: usize, F: Field + From<i32>>(coeffs: [i32; N]) -> DensePolynomial<F> {
+    DensePolynomial::from_coefficients_vec(coeffs.iter().map(|c| F::from(*c)).collect())
+}
 
-    let evals : HashMap<usize,F> = evals.iter().cloned().collect();
+impl<F: Field> MultiPolyUtils<F> for SparsePolynomial<F, SparseTerm> {
+    fn partial_eval(&self, evals: &[(usize, F)]) -> Self {
+        let evals: HashMap<usize, F> = evals.iter().cloned().collect();
 
-    // substitute
-    let terms: Vec<(F, Vec<(usize, usize)>)> = self
-        .terms
-        .iter()
-        .map(|(factor, vars)| {
-            let mut factor = *factor;
-            let mut new_vars = vec![];
-            for (var, pow) in vars.iter() {
-                if let Some(value) = evals.get(var) {
-                    factor *= value.pow([*pow as u64]);
-                } else {
-                    new_vars.push((*var, *pow));
+        // substitute
+        let terms: Vec<(F, Vec<(usize, usize)>)> = self
+            .terms
+            .iter()
+            .map(|(factor, vars)| {
+                let mut factor = *factor;
+                let mut new_vars = vec![];
+                for (var, pow) in vars.iter() {
+                    if let Some(value) = evals.get(var) {
+                        factor *= value.pow([*pow as u64]);
+                    } else {
+                        new_vars.push((*var, *pow));
+                    }
+                }
+                new_vars.sort_by(|a, b| format!("{}{}", a.0, a.1).cmp(&format!("{}{}", b.0, b.1)));
+                (factor, new_vars)
+            })
+            .collect();
+
+        let mut compact = BTreeMap::new();
+        for (f, term) in terms {
+            let entry = compact
+                .entry(format!("{:?}", term))
+                .or_insert((F::ZERO, SparseTerm::new(term)));
+            entry.0 += f;
+        }
+
+        SparsePolynomial::from_coefficients_vec(self.num_vars, compact.into_values().collect())
+    }
+}
+
+impl<F: Field> UniPolyUtils<F> for DensePolynomial<F> {
+    /// Substitutes x with p(x)
+    fn compose(&self, p: &DensePolynomial<F>) -> DensePolynomial<F> {
+        let mut res = DensePolynomial {
+            coeffs: vec![self.coeffs[0]],
+        };
+        let mut p_pow = p.clone();
+        for coeff in self.coeffs.iter().skip(1) {
+            res = res + &p_pow * *coeff;
+            p_pow = p_pow.naive_mul(p);
+        }
+        res
+    }
+    fn lagrange(p: &[(F, F)]) -> DensePolynomial<F> {
+        let k = p.len();
+        let mut l = DensePolynomial::zero();
+        for j in 0..k {
+            let mut l_j = DensePolynomial::from_coefficients_vec(vec![F::one()]);
+            for i in 0..k {
+                if i != j {
+                    let c = (p[j].0 - p[i].0).inverse();
+                    assert!(c.is_some(), "lagrange polinomial x points must be unique");
+                    let c = c.unwrap();
+                    l_j = l_j.naive_mul(&DensePolynomial::from_coefficients_vec(vec![
+                        -(c * p[i].0),
+                        c,
+                    ]));
                 }
             }
-            new_vars.sort_by(|a, b| format!("{}{}", a.0, a.1).cmp(&format!("{}{}", b.0, b.1)));
-            (factor, new_vars)
-        })
-        .collect();
-
-    let mut compact = BTreeMap::new();
-    for (f, term) in terms {
-        let entry = compact
-            .entry(format!("{:?}", term))
-            .or_insert((F::ZERO, SparseTerm::new(term)));
-        entry.0 += f;
+            l += &(&l_j * p[j].1);
+        }
+        l
     }
-
-    SparsePolynomial::from_coefficients_vec(self.num_vars, compact.into_values().collect())
-}
+    fn vanishing<I: IntoIterator<Item=F>>(zeros: I) -> DensePolynomial<F> {
+        let mut vanishing = DensePolynomial::from_coefficients_vec(vec![F::ONE]);
+        for x in zeros.into_iter() {
+            vanishing = vanishing.naive_mul(&DensePolynomial::from_coefficients_vec(vec![
+                -x,
+                F::ONE,
+            ]));
+        }
+        vanishing
+    }
 }
 
 #[cfg(test)]
@@ -390,4 +446,41 @@ mod tests {
         assert_eq!(s2.to_string(), "1064");
     }
 
+    #[test]
+    fn test_subst() {
+        let check = |f_str: &str, subst_str: &str| {
+            let val = Fr::from(13331u64);
+            let f = str_to_unipoly(f_str).unwrap();
+            let subst = str_to_unipoly(subst_str).unwrap();
+            let ev1 = f.evaluate(&subst.evaluate(&val));
+            let ev2 = f.compose(&subst).evaluate(&val);
+            assert_eq!(
+                ev1,
+                ev2,
+                "{} {} => {}",
+                unipoly_to_str(&f),
+                unipoly_to_str(&subst),
+                unipoly_to_str(&f.compose(&subst))
+            );
+        };
+
+        check("2", "2x");
+        check("2x", "2x");
+        check("1+2x^3", "1+x+2x^2");
+        check("x^2", "6+16x+2x^2+13x^3");
+    }
+
+    #[test]
+    fn test_lagrange() {
+        let points = vec![
+            (Fr::from(1u64), Fr::from(2u64)),
+            (Fr::from(5u64), Fr::from(7u64)),
+            (Fr::from(7u64), Fr::from(9u64)),
+            (Fr::from(3u64), Fr::from(1u64)),
+        ];
+        let l = DensePolynomial::lagrange(&points);
+        points
+            .iter()
+            .for_each(|p| assert_eq!(l.evaluate(&p.0), p.1));
+    }
 }

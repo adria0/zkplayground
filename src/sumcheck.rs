@@ -4,7 +4,13 @@
 SUMCHECK
 
 Provide an argument to a verifier to check the sum of all the images of g()
-without the verifier checking all the images of g, only log(#n) checks are needed
+without the verifier checking all the images of g, only log(#n) checks are needed.
+
+g() must be in the form of a multivariate polynomial with n boolean variables.
+
+The strategy here is to reduce the polinomial substituting a variable 
+each time by a random element  and then check that the sum of the images of the
+resulting polinomial is the same as the image of the original polinomial.
 
 https://hackmd.io/@CPerezz/BJXq7U9Bn
 https://zkproof.org/2020/03/16/sum-checkprotocol/

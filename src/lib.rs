@@ -6,3 +6,5 @@ mod fri;
 mod util;
 mod multiplication_argument;
 mod kzg;
+mod srs;
+mod interactive_protocol;

@@ -1,4 +1,5 @@
-use crate::util::{poly, UniPolyUtils, PolyToString};
+use crate::util::*;
+
 use ark_ff::Field;
 use ark_poly::univariate::DensePolynomial;
 
@@ -69,6 +70,7 @@ impl<F: Field> FriCommitment<F> {
         }
     }
 
+
     fn print(&self) {
         for (i,(g,h)) in self.g_h_s.iter().enumerate() {
             println!("{}.g={}", i, g.to_string());
@@ -82,7 +84,7 @@ impl<F: Field> FriCommitment<F> {
 
 #[test]
 fn test_fri() {
-    use crate::util::{poly, UniPolyUtils, *};
+    use crate::util::*;
     use ark_poly::{DenseMVPolynomial, Polynomial};
 
     type F = ark_bn254::fr::Fr;
@@ -91,6 +93,4 @@ fn test_fri() {
 
     let commitment = FriCommitment::commit(p, &[F::from(3), F::from(5), F::from(7)]);
     commitment.print();
-
-
 }

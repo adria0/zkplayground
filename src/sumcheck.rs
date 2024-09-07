@@ -55,12 +55,9 @@ impl<F: Field> InteractiveVerifier<SparsePolynomial<F, SparseTerm>, F> for Sumch
                 vec![(self.sumcheck.sum, SparseTerm::default())],
             )
         } else {
-            last_poly
-                .partial_eval(&[(self.challenges.len() - 1, self.challenges[self.challenges.len() - 1])])
+            last_poly.
+               partial_eval(&[(self.challenges.len() - 1, self.challenges[self.challenges.len() - 1])])
         };
-
-        println!("this_round_eval: {}",this_round_eval.to_string());
-        println!("last_round_eval: {}",last_round_eval.to_string());
 
         if this_round_eval != last_round_eval {
             return VerifierResponse::Failed("this_round_eval != last_round_eval".into());
@@ -107,10 +104,9 @@ impl<F: Field> SumcheckProver<F> {
         // polinomial coefficients are [r0, r1, r2, ...., VAR, ... , <domain> ]
 
         let r_vars = self.challenges.iter().cloned().enumerate().collect::<Vec<_>>();
-        let subdomain =
-            gen_boolean_hypercube_domain::<F>(self.sumcheck.f.num_vars - 1 - self.challenges.len());
-
-        if subdomain.is_empty() {
+        let subdomain_dimension = self.sumcheck.f.num_vars - 1 - self.challenges.len();
+        let subdomain = gen_boolean_hypercube_domain::<F>(subdomain_dimension);
+        if subdomain.is_empty()  {
             self.sumcheck.f.partial_eval(&r_vars)
         } else {
             let mut s = SparsePolynomial::zero();
@@ -124,7 +120,6 @@ impl<F: Field> SumcheckProver<F> {
                 evals.append(&mut r_vars.clone());
                 s = s + self.sumcheck.f.partial_eval(&evals)
             }
-
             s
         }
     }
@@ -261,7 +256,7 @@ mod test {
         // sends s2 to verifier
 
         let s2 = g.partial_eval(&[(X, r0), (Y, r1)]);
-
+    
         // --- Verifier
 
         // checks that s2(0) + s2(1) == s1(r1), that is the final check
@@ -276,6 +271,9 @@ mod test {
 }
 
 fn gen_boolean_hypercube_domain<F: Field>(pow: usize) -> Vec<Vec<F>> {
+    if pow == 0 {
+        vec![]
+    } else {
     let mut domain = vec![vec![F::ZERO], vec![F::ONE]];
     for _ in 1..pow {
         domain = domain
@@ -289,4 +287,5 @@ fn gen_boolean_hypercube_domain<F: Field>(pow: usize) -> Vec<Vec<F>> {
             .collect();
     }
     domain
+    }
 }

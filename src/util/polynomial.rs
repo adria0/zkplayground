@@ -258,8 +258,8 @@ mod tests {
 
         check("2", "2x");
         check("2x", "2x");
-        check("1+2x^3", "1+x+2x^2");
-        check("x^2", "6+16x+2x^2+13x^3");
+        check("2x^3+1", "2x^2+x+1");
+        check("x^2", "13x^3+2x^2+16x+6");
     }
 
     #[test]

@@ -2,6 +2,7 @@
 
 /*
 SUMCHECK
+-----------
 Provide an argument to a verifier to
 - check that the sum of all the images of g() is a value being g() a boolean-multivariate
   low-degree polinomial (so domain is a boolean hypercube)
@@ -9,28 +10,31 @@ Provide an argument to a verifier to
 https://hackmd.io/@CPerezz/BJXq7U9Bn
 https://zkproof.org/2020/03/16/sum-checkprotocol/
 https://semiotic.ai/articles/sumcheck-tutorial/
+
 */
 
 use crate::interactive_protocol::{InteractiveVerifier, VerifierResponse, InteractiveProver};
 use crate::util::*;
 use ark_ff::{Field, Zero};
+use ark_poly::evaluations::multivariate::multilinear::DenseMultilinearExtension;
 use ark_poly::multivariate::{SparsePolynomial, SparseTerm};
 use ark_poly::{DenseMVPolynomial, Polynomial};
+use ark_poly::evaluations::multivariate::multilinear::{MultilinearExtension};
 
 #[derive(Clone)]
-struct SumCheck<F: Field> {
-    f: SparsePolynomial<F, SparseTerm>,
-    sum: F,
+pub struct SumCheck<F: Field> {
+    pub f: SparsePolynomial<F, SparseTerm>,
+    pub sum: F,
 }
 
-struct SumcheckVerifier<F: Field> {
-    sumcheck: SumCheck<F>,
-    challenges: Vec<F>,
-    polys: Vec<SparsePolynomial<F, SparseTerm>>,
+pub struct SumcheckVerifier<F: Field> {
+    pub sumcheck: SumCheck<F>,
+    pub challenges: Vec<F>,
+    pub polys: Vec<SparsePolynomial<F, SparseTerm>>,
 }
 
 impl<F: Field> SumcheckVerifier<F> {
-    fn new(sumcheck: SumCheck<F>) -> Self {
+    pub fn new(sumcheck: SumCheck<F>) -> Self {
         Self {
             polys: vec![sumcheck.f.clone()],
             sumcheck,
@@ -58,10 +62,7 @@ impl<F: Field> InteractiveVerifier<SparsePolynomial<F, SparseTerm>, F> for Sumch
             last_poly
                 .partial_eval(&[(self.challenges.len() - 1, self.challenges[self.challenges.len() - 1])])
         };
-
-        println!("this_round_eval: {}",this_round_eval.to_string());
-        println!("last_round_eval: {}",last_round_eval.to_string());
-
+       
         if this_round_eval != last_round_eval {
             return VerifierResponse::Failed("this_round_eval != last_round_eval".into());
         }
@@ -84,9 +85,9 @@ impl<F: Field> InteractiveVerifier<SparsePolynomial<F, SparseTerm>, F> for Sumch
     }
 }
 
-struct SumcheckProver<F: Field> {
-    sumcheck: SumCheck<F>,
-    challenges: Vec<F>,
+pub struct SumcheckProver<F: Field> {
+    pub sumcheck: SumCheck<F>,
+    pub challenges: Vec<F>,
 }
 
 impl<F: Field> SumcheckProver<F> {
@@ -141,6 +142,25 @@ impl<F: Field> InteractiveProver<SparsePolynomial<F, SparseTerm>, F> for Sumchec
    }
 }
 
+pub fn gen_boolean_hypercube_domain<F: Field>(pow: usize) -> Vec<Vec<F>> {
+    if pow == 0 {
+        return vec![vec![]];
+    }
+    let mut domain = vec![vec![F::ZERO], vec![F::ONE]];
+    for _ in 1..pow {
+        domain = domain
+            .into_iter()
+            .flat_map(|mut v| {
+                let mut zero = v.clone();
+                zero.push(F::ZERO);
+                v.push(F::ONE);
+                vec![zero, v]
+            })
+            .collect();
+    }
+    domain
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -153,13 +173,21 @@ mod test {
     use ark_poly::{DenseMVPolynomial, Polynomial};
 
     #[test]
-    fn sumcheck() {
-        //let mut prover = SumcheckProver::<F>::new(mvpoly!("2x^3+xz+yz+8yw^8"));
+    fn sumcheck_small() {
         let mut prover = SumcheckProver::<F>::new(mvpoly!("2x^3+xz+yz"));
         let mut verifier = SumcheckVerifier::new(prover.sumcheck.clone());
 
         test_interactive_protocol(&mut prover, &mut verifier).expect("should pass");
     }
+
+    #[test]
+    fn sumcheck_larger() {
+        let mut prover = SumcheckProver::<F>::new(mvpoly!("2x^3+xz+yz+8yw^8"));
+        let mut verifier = SumcheckVerifier::new(prover.sumcheck.clone());
+
+        test_interactive_protocol(&mut prover, &mut verifier).expect("should pass");
+    }
+
 
     #[test]
     fn sumcheck_by_hand() {
@@ -275,18 +303,3 @@ mod test {
     }
 }
 
-fn gen_boolean_hypercube_domain<F: Field>(pow: usize) -> Vec<Vec<F>> {
-    let mut domain = vec![vec![F::ZERO], vec![F::ONE]];
-    for _ in 1..pow {
-        domain = domain
-            .into_iter()
-            .flat_map(|mut v| {
-                let mut zero = v.clone();
-                zero.push(F::ZERO);
-                v.push(F::ONE);
-                vec![zero, v]
-            })
-            .collect();
-    }
-    domain
-}

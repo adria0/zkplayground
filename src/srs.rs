@@ -71,7 +71,7 @@ impl SRS {
         (Self { g1s, g2s }, g1(new_tau))
     }    
 
-    // append a contributin to the current SRS
+    // append a contributin to the current SR
     pub fn append_contribution(&mut self, contrib: (SRS, G1)) -> bool {
         let (new_srs, new_tau_g2) = contrib;
 

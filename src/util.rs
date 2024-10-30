@@ -13,6 +13,7 @@ use std::ops::Mul;
 use std::str::Chars;
 
 mod common;
+pub mod mt;
 pub mod polynomial;
 pub mod mvpolynomial;
 

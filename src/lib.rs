@@ -2,6 +2,7 @@
 #![allow(non_snake_case)]
 
 mod sumcheck;
+mod zerocheck;
 mod fri;
 mod util;
 mod multiplication_argument;

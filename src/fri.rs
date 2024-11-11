@@ -195,18 +195,5 @@ mod test {
         let mut rng = new_rng();
         assert!(commitment.verify(&domain_elements, &mut rng));
     }
-/* 
-    #[test]
-    fn test_fri() {
-        use crate::util::*;
-        use ark_poly::{DenseMVPolynomial, Polynomial};
 
-        type F = ark_bn254::fr::Fr;
-
-        let p: DensePolynomial<F> = poly!("5x^5+3x^4+7x^3+2x^2+x+3");
-
-        let commitment = FriCommitment::commit(p, &[F::from(3), F::from(5), F::from(7)]);
-        commitment.print();
-    }
-    */
 }

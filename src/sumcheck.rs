@@ -16,10 +16,13 @@ https://semiotic.ai/articles/sumcheck-tutorial/
 use crate::interactive_protocol::{InteractiveVerifier, VerifierResponse, InteractiveProver};
 use crate::util::*;
 use ark_ff::{Field, Zero};
-use ark_poly::evaluations::multivariate::multilinear::DenseMultilinearExtension;
 use ark_poly::multivariate::{SparsePolynomial, SparseTerm};
 use ark_poly::{DenseMVPolynomial, Polynomial};
-use ark_poly::evaluations::multivariate::multilinear::{MultilinearExtension};
+use rand::SeedableRng;
+use blake2::{Blake2b, Blake2b512, Blake2bVar, Blake2s256, Digest};
+use rand_chacha::ChaCha12Rng;
+use blake2::digest::VariableOutput;
+use blake2::digest::Update;
 
 #[derive(Clone)]
 pub struct SumCheck<F: Field> {
@@ -28,6 +31,7 @@ pub struct SumCheck<F: Field> {
 }
 
 pub struct SumcheckVerifier<F: Field> {
+    pub rng: ChaCha12Rng,
     pub sumcheck: SumCheck<F>,
     pub challenges: Vec<F>,
     pub polys: Vec<SparsePolynomial<F, SparseTerm>>,
@@ -35,10 +39,12 @@ pub struct SumcheckVerifier<F: Field> {
 
 impl<F: Field> SumcheckVerifier<F> {
     pub fn new(sumcheck: SumCheck<F>) -> Self {
+        let f_hash = sumcheck.f.hash256();
         Self {
             polys: vec![sumcheck.f.clone()],
             sumcheck,
             challenges: vec![],
+            rng: ChaCha12Rng::from_seed(f_hash),
         }
     }
 }
@@ -77,8 +83,7 @@ impl<F: Field> InteractiveVerifier<SparsePolynomial<F, SparseTerm>, F> for Sumch
         if self.challenges.len() == self.sumcheck.f.num_vars - 1 {
             VerifierResponse::Success
         } else {
-            let mut rand = rand::thread_rng();
-            let r = F::rand(&mut rand);
+            let r = F::rand(&mut self.rng);
             self.challenges.push(r);
             VerifierResponse::Challenge(r)
         }

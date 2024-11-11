@@ -1,3 +1,5 @@
+#![allow(clippy::needless_range_loop)]
+
 // https://eprint.iacr.org/2024/108.pdf
 // https://eprint.iacr.org/2022/1355.pdf page 25
 // https://xn--2-umb.com/24/sumcheck/
@@ -110,7 +112,7 @@ mod test {
     #[test]
     fn test_zerocheck() {
 
-        // x(1−x)+y(1−y)+z(1−z) evals to zero in all points
+        // g = x(1−x)+y(1−y)+z(1−z) evals to zero in all points
         let g =
           naive_mul(&mvpoly!("x"), &mvpoly!("1-x")) + 
           naive_mul(&mvpoly!("y"), &mvpoly!("1-y")) + 
@@ -124,14 +126,15 @@ mod test {
           }
         }
 
-        // select a random element alpha, and build the eq polynomial
+        // select a random element alpha <0 1 0>
+        // and build the multilinear eq polynomial xyz-xy-yz+y
         let alpha = vec![Fq::zero(), Fq::one(), Fq::zero()];
         let eq_poly = build_eq_poly(alpha);
 
         // build the zero check polynomial
+        //   x^3yz-xy^3z-xyz^3+x^3y+2x^2yz+xy^3+xy^2z+2xyz^2+y^3z+yz^3
+        //   -2x^2y-xy^2-2xyz-y^3-y^2z-2yz^2+xy+y^2+yz
         let zero_check = naive_mul(&g, &eq_poly);
-
-        println!("zero_check={}", zero_check.to_string());
 
         // run sumcheck over this polynomial
         let mut prover = SumcheckProver::<Fq>::new(zero_check);

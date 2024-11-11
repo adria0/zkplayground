@@ -7,6 +7,8 @@ use ark_poly::{
     DenseUVPolynomial, Polynomial,
 };
 use ark_std::One;
+use blake2::digest::{Update, VariableOutput};
+use blake2::Blake2bVar;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Display;
 use std::ops::Mul;
@@ -21,7 +23,9 @@ const EXTVAR: char = 'v';
 pub trait MVPolyUtils<F> {
     fn partial_eval(&self, evals: &[(usize, F)]) -> Self;
     fn var_degree(&self, var: usize) -> usize;
+    fn hash256(&self) -> [u8; 32];
 }
+
 
 
 impl<F: Field + Display> PolyToString for SparsePolynomial<F, SparseTerm> {
@@ -183,6 +187,21 @@ impl<F: Field> MVPolyUtils<F> for SparsePolynomial<F, SparseTerm> {
             .max()
             .unwrap_or(0)
     }
+    fn hash256(&self) -> [u8; 32] {
+        let mut blake2 = Blake2bVar::new(10).unwrap();
+        for (f, term) in self.terms() {
+            let mut buff = vec![];
+            f.serialize_uncompressed(&mut buff).unwrap();
+            blake2.update(&buff);
+            for (var,pow) in &**term {
+                blake2.update(&var.to_le_bytes());
+                blake2.update(&pow.to_le_bytes());
+            }
+        }
+        let mut hash = [0u8; 32];
+        blake2.finalize_variable(&mut hash);  
+        hash      
+    }
 }
 
 #[cfg(test)]
@@ -201,6 +220,7 @@ mod tests {
             Fr::from_str(s).unwrap()
         }
     }
+    
     fn dp(coeffs: &[&str]) -> DensePolynomial<Fr> {
         let coeffs = coeffs.iter().map(|c| n(c)).collect::<Vec<_>>();
         DenseUVPolynomial::from_coefficients_vec(coeffs)
